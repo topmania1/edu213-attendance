@@ -6,6 +6,9 @@ import requests
 # YOUR GOOGLE APPS SCRIPT WEB APP URL
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyI8u1v3lD441oQI6vogDGWj-0e0EkX9gWMmKJATUvFG5owsnyVStImLhKzBa5c68cJ/exec"
 
+# SET YOUR LECTURER MASTER PASSWORD HERE
+LECTURER_PASSWORD = "YOUR_SECRET_MASTER_PASSWORD_HERE"
+
 st.set_page_config(page_title="EDU 213 Attendance", layout="centered")
 st.title("EDU 213 Attendance System")
 
@@ -33,7 +36,7 @@ with tab1:
                 st.error("Invalid or missing Classroom PIN. Check the whiteboard.")
             else:
                 try:
-                    # Automatically extract department from matric number (e.g., BUE/24/1234 -> BUE)
+                    # Automatically extract department from matric number
                     parts = matric_input.split('/')
                     department = parts[0] if len(parts) > 1 else "GENERAL"
                     
@@ -56,16 +59,27 @@ with tab1:
                 except Exception as ex:
                     st.error(f"Connection error: {ex}")
 
-# --- TAB 2: LECTURER CONTROL PANEL ---
+# --- TAB 2: LECTURER CONTROL PANEL (PASSWORD PROTECTED) ---
 with tab2:
-    st.subheader("Lecturer Controls")
+    st.subheader("Lecturer Authentication")
+    admin_pass = st.text_input("Enter Master Password to Unlock Controls:", type="password")
     
-    new_pin = st.text_input("Set Today's 4-Digit Classroom PIN:", max_chars=4, type="password")
-    if st.button("Activate PIN"):
-        st.session_state['active_code'] = new_pin
-        st.success(f"Classroom PIN activated: {new_pin}")
-    
-    st.divider()
-    
-    st.subheader("Live Attendance Log")
-    st.info("💡 Your student check-ins are now automatically sorted by Department inside your Google Sheet!")
+    if admin_pass == LECTURER_PASSWORD:
+        st.success("Access Granted.")
+        st.divider()
+        
+        st.subheader("Set Active Classroom PIN")
+        new_pin = st.text_input("Set Today's Classroom PIN/Codeword:", type="password")
+        if st.button("Activate PIN"):
+            st.session_state['active_code'] = new_pin
+            st.success(f"Classroom PIN activated: {new_pin}")
+        
+        st.divider()
+        st.subheader("Status")
+        current_pin = st.session_state.get('active_code', None)
+        if current_pin:
+            st.info(f"Current Active PIN: **{current_pin}**")
+        else:
+            st.warning("No active PIN set right now. Students cannot check in.")
+    elif admin_pass != "":
+        st.error("Incorrect Master Password.")
