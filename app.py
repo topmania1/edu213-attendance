@@ -7,7 +7,7 @@ import requests
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyI8u1v3lD441oQI6vogDGWj-0e0EkX9gWMmKJATUvFG5owsnyVStImLhKzBa5c68cJ/exec"
 
 # SET YOUR LECTURER MASTER PASSWORD HERE
-LECTURER_PASSWORD = "YOUR_SECRET_MASTER_PASSWORD_HERE"
+LECTURER_PASSWORD = "Usmania1@"
 
 st.set_page_config(page_title="EDU 213 Attendance", layout="centered")
 st.title("EDU 213 Attendance System")
