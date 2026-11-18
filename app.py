@@ -1,13 +1,12 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 import requests
 
 # YOUR GOOGLE APPS SCRIPT WEB APP URL
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyI8u1v3lD441oQI6vogDGWj-0e0EkX9gWMmKJATUvFG5owsnyVStImLhKzBa5c68cJ/exec"
+WEB_APP_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE"
 
 # SET YOUR LECTURER MASTER PASSWORD HERE
-LECTURER_PASSWORD = "Usmania1@"
+LECTURER_PASSWORD = "YOUR_SECRET_MASTER_PASSWORD_HERE"
 
 st.set_page_config(page_title="EDU 213 Attendance", layout="centered")
 st.title("EDU 213 Attendance System")
@@ -22,44 +21,50 @@ with tab1:
     with st.form(key='student_checkin_form', clear_on_submit=True):
         name_input = st.text_input("Full Name (e.g., John Doe):").strip()
         matric_input = st.text_input("Matriculation Number (e.g., BUE/24/5678):").strip().upper()
-        pin_input = st.text_input("Today's Classroom PIN:", type="password")
+        pin_input = st.text_input("Today's Classroom PIN:", type="password").strip()
         
         submit_btn = st.form_submit_button("Submit Attendance")
         
         if submit_btn:
-            active_code = st.session_state.get('active_code', '')
-            today_date = datetime.now().strftime("%Y-%m-%d")
-            
-            if not name_input or not matric_input:
-                st.warning("Please fill in both your Full Name and Matriculation Number.")
-            elif pin_input != active_code or active_code == '':
-                st.error("Invalid or missing Classroom PIN. Check the whiteboard.")
+            if not name_input or not matric_input or not pin_input:
+                st.warning("Please fill in your Name, Matriculation Number, and Classroom PIN.")
             else:
                 try:
-                    # Automatically extract department from matric number
-                    parts = matric_input.split('/')
-                    department = parts[0] if len(parts) > 1 else "GENERAL"
+                    # 1. Fetch the global active PIN from Google Sheets
+                    pin_check = requests.get(WEB_APP_URL).json()
+                    active_code = str(pin_check.get("active_pin", "")).strip()
                     
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    payload = {
-                        "timestamp": now,
-                        "session_date": today_date,
-                        "name": name_input,
-                        "matric_no": matric_input,
-                        "department": department,
-                        "course_code": "EDU 213"
-                    }
-                    
-                    response = requests.post(WEB_APP_URL, json=payload)
-                    
-                    if response.status_code == 200:
-                        st.success(f"Success! Attendance recorded for {name_input} ({department}).")
+                    if active_code == "" or active_code == "CLOSED":
+                        st.error("Attendance is currently closed by the lecturer.")
+                    elif pin_input != active_code:
+                        st.error("Invalid Classroom PIN. Check the whiteboard.")
                     else:
-                        st.error("Failed to log attendance. Please try again.")
+                        # 2. PIN matches! Submit attendance
+                        parts = matric_input.split('/')
+                        department = parts[0] if len(parts) > 1 else "GENERAL"
+                        
+                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        today_date = datetime.now().strftime("%Y-%m-%d")
+                        
+                        payload = {
+                            "timestamp": now,
+                            "session_date": today_date,
+                            "name": name_input,
+                            "matric_no": matric_input,
+                            "department": department,
+                            "course_code": "EDU 213"
+                        }
+                        
+                        response = requests.post(WEB_APP_URL, json=payload)
+                        
+                        if response.status_code == 200:
+                            st.success(f"Success! Attendance recorded for {name_input} ({department}).")
+                        else:
+                            st.error("Failed to log attendance. Please try again.")
                 except Exception as ex:
                     st.error(f"Connection error: {ex}")
 
-# --- TAB 2: LECTURER CONTROL PANEL (PASSWORD PROTECTED) ---
+# --- TAB 2: LECTURER CONTROL PANEL ---
 with tab2:
     st.subheader("Lecturer Authentication")
     admin_pass = st.text_input("Enter Master Password to Unlock Controls:", type="password")
@@ -69,17 +74,22 @@ with tab2:
         st.divider()
         
         st.subheader("Set Active Classroom PIN")
-        new_pin = st.text_input("Set Today's Classroom PIN/Codeword:", type="password")
-        if st.button("Activate PIN"):
-            st.session_state['active_code'] = new_pin
-            st.success(f"Classroom PIN activated: {new_pin}")
+        new_pin = st.text_input("Enter New PIN/Codeword:").strip()
         
-        st.divider()
-        st.subheader("Status")
-        current_pin = st.session_state.get('active_code', None)
-        if current_pin:
-            st.info(f"Current Active PIN: **{current_pin}**")
-        else:
-            st.warning("No active PIN set right now. Students cannot check in.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Activate PIN"):
+                if new_pin:
+                    res = requests.post(WEB_APP_URL, json={"action": "set_pin", "pin": new_pin})
+                    if res.status_code == 200:
+                        st.success(f"Global PIN activated: **{new_pin}** (Works on all student phones now!)")
+                else:
+                    st.warning("Type a PIN first.")
+        with col2:
+            if st.button("Close Attendance"):
+                res = requests.post(WEB_APP_URL, json={"action": "set_pin", "pin": "CLOSED"})
+                if res.status_code == 200:
+                    st.info("Attendance is now CLOSED.")
+                    
     elif admin_pass != "":
         st.error("Incorrect Master Password.")
